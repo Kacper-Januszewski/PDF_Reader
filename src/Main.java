@@ -1,90 +1,121 @@
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.pdfbox.Loader;
-import org.apache.poi.xwpf.usermodel.ParagraphAlignment;
-import org.apache.poi.xwpf.usermodel.XWPFDocument;
-import org.apache.poi.xwpf.usermodel.XWPFParagraph;
-import org.apache.poi.xwpf.usermodel.XWPFRun;
+import org.apache.poi.xwpf.usermodel.*;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.io.*;
 
 public class Main {
+    private JFrame frame;
+    private JLabel fileLabel;
+    private File selectedFile;
+
     public static void main(String[] args) {
-        String pdfFilePath = "C:\\Users\\kacpe\\Downloads\\1.pdf";  // Ścieżka do pliku PDF
-        String wordFilePath = "output.docx"; // Ścieżka do pliku Word
+        try {
+            // Ustaw natywny wygląd (np. Windows Look & Feel)
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        SwingUtilities.invokeLater(() -> new Main().createAndShowGUI());
+    }
+
+    private void createAndShowGUI() {
+        frame = new JFrame("PDF ➜ Word Converter");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(400, 150);
+        frame.setLayout(new FlowLayout());
+
+        JButton chooseButton = new JButton("Wybierz plik PDF");
+        JButton processButton = new JButton("Procesuj");
+        fileLabel = new JLabel("Brak wybranego pliku.");
+
+        chooseButton.addActionListener(this::onChooseFile);
+        processButton.addActionListener(this::onProcessFile);
+
+        frame.add(chooseButton);
+        frame.add(processButton);
+        frame.add(fileLabel);
+
+        frame.setVisible(true);
+    }
+
+    private void onChooseFile(ActionEvent e) {
+        JFileChooser fileChooser = new JFileChooser();
+        int result = fileChooser.showOpenDialog(frame);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            selectedFile = fileChooser.getSelectedFile();
+            fileLabel.setText("Wybrano: " + selectedFile.getName());
+        }
+    }
+
+    private void onProcessFile(ActionEvent e) {
+        if (selectedFile == null) {
+            JOptionPane.showMessageDialog(frame, "Najpierw wybierz plik PDF.");
+            return;
+        }
 
         try {
-            // Załaduj plik PDF
-            File file = new File(pdfFilePath);
-            PDDocument document = Loader.loadPDF(file);
-
-            // Przygotuj obiekt do zapisu tekstu z PDF
+            PDDocument document = Loader.loadPDF(selectedFile);
             PDFTextStripper stripper = new PDFTextStripper();
             int totalPages = document.getNumberOfPages();
             XWPFDocument wordDoc = new XWPFDocument();
 
-            // Iteruj przez wszystkie strony w PDF
             for (int pageNum = 1; pageNum <= totalPages; pageNum++) {
                 stripper.setStartPage(pageNum);
                 stripper.setEndPage(pageNum);
-                String pageText = stripper.getText(document);  // Wydobądź tekst z danej strony
-
-                // Podziel tekst na linie
+                String pageText = stripper.getText(document);
                 String[] lines = pageText.split("\n");
 
                 StringBuilder paragraphBuilder = new StringBuilder();
                 for (String line : lines) {
-                    // Jeśli linia jest pusta (pusty wiersz), traktujemy to jako nowy akapit
                     if (line.trim().isEmpty()) {
-                        // Dodajemy akapit, jeśli nie jest pusty
                         if (paragraphBuilder.length() > 0) {
-                            // Tworzymy nowy akapit w Wordzie
-                            XWPFParagraph wordParagraph = wordDoc.createParagraph();
-                            wordParagraph.setAlignment(ParagraphAlignment.LEFT);
-                            XWPFRun run = wordParagraph.createRun();
+                            XWPFParagraph paragraph = wordDoc.createParagraph();
+                            paragraph.setAlignment(ParagraphAlignment.LEFT);
+
+                            XWPFRun run = paragraph.createRun();
                             run.setText(paragraphBuilder.toString().trim());
 
-                            // Dodaj numer strony w tym samym run, ale pogrubiony
-                            XWPFRun pageNumberRun = wordParagraph.createRun();
-                            pageNumberRun.setText(", s. " + pageNum);
-                            pageNumberRun.setBold(true);  // Pogrubienie numeru strony
-                        }
+                            XWPFRun bold = paragraph.createRun();
+                            bold.setBold(true);
+                            bold.setText(", s. " + pageNum);
 
-                        // Zresetuj builder do nowego akapitu
-                        paragraphBuilder.setLength(0);
+                            paragraphBuilder.setLength(0);
+                        }
                     } else {
-                        // Dodaj linię do aktualnego akapitu
                         paragraphBuilder.append(line.trim()).append(" ");
                     }
                 }
 
-                // Dodaj ostatni akapit na stronie, jeśli istnieje
                 if (paragraphBuilder.length() > 0) {
-                    XWPFParagraph wordParagraph = wordDoc.createParagraph();
-                    wordParagraph.setAlignment(ParagraphAlignment.LEFT);
-                    XWPFRun run = wordParagraph.createRun();
+                    XWPFParagraph paragraph = wordDoc.createParagraph();
+                    paragraph.setAlignment(ParagraphAlignment.LEFT);
+
+                    XWPFRun run = paragraph.createRun();
                     run.setText(paragraphBuilder.toString().trim());
 
-                    // Dodaj numer strony w tym samym run, ale pogrubiony
-                    XWPFRun pageNumberRun = wordParagraph.createRun();
-                    pageNumberRun.setText(", s. " + pageNum);
-                    pageNumberRun.setBold(true);  // Pogrubienie numeru strony
+                    XWPFRun bold = paragraph.createRun();
+                    bold.setBold(true);
+                    bold.setText(", s. " + pageNum);
                 }
             }
 
-            // Zapisz dokument Word
-            FileOutputStream out = new FileOutputStream(wordFilePath);
+            String outputPath = selectedFile.getParent() + File.separator + "output.docx";
+            FileOutputStream out = new FileOutputStream(outputPath);
             wordDoc.write(out);
             out.close();
-
-            // Zamknij dokument PDF
             document.close();
-            System.out.println("Przetwarzanie zakończone, plik 'output.docx' został zapisany.");
 
-        } catch (IOException e) {
-            e.printStackTrace();
+            JOptionPane.showMessageDialog(frame, "Zapisano jako output.docx!");
+
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(frame, "Wystąpił błąd przy przetwarzaniu.");
         }
     }
 }
