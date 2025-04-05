@@ -9,5 +9,6 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="apache.pdfbox" level="project" />
     <orderEntry type="library" name="apache.poi.ooxml" level="project" />
+    <orderEntry type="library" name="fr.opensagres.xdocreport.apache.poi.xwpf.converter.core" level="project" />
   </component>
 </module>
